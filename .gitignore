@@ -1,0 +1,15 @@
+Add-Content .gitignore ".env"
+
+@"
+
+# Environment / credentials
+.env
+.env.*
+
+# Build output
+absensi-go.exe
+*.exe
+
+# Temporary files
+*.log
+"@ | Add-Content .gitignore
