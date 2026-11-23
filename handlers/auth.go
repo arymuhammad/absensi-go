@@ -1,4 +1,3 @@
-
 package handlers
 
 import (
@@ -25,34 +24,48 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	_, _ = w.Write(result)
 }
 
-// getPost membaca input dari JSON atau form-urlencoded.
-func getPost(r *http.Request, key string) (string, error) {
+// getPostValues membaca seluruh input request satu kali.
+func getPostValues(r *http.Request) (map[string]string, error) {
+	// Menyiapkan tempat untuk menyimpan input.
+	values := make(map[string]string)
+
+	// Mengambil jenis konten request.
 	contentType := strings.TrimSpace(
 		strings.Split(r.Header.Get("Content-Type"), ";")[0],
 	)
 
+	// Jika request menggunakan JSON.
 	if contentType == "application/json" {
 		var input map[string]any
 
+		// Membaca body JSON satu kali.
 		err := json.NewDecoder(r.Body).Decode(&input)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
-		value, exists := input[key]
-		if !exists || value == nil {
-			return "", nil
+		// Mengubah setiap nilai JSON menjadi string.
+		for key, value := range input {
+			if value == nil {
+				continue
+			}
+
+			values[key] = fmt.Sprint(value)
 		}
 
-		return fmt.Sprint(value), nil
+		return values, nil
 	}
 
+	// Jika bukan JSON, baca sebagai form-urlencoded.
 	err := r.ParseForm()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return r.FormValue(key), nil
+	values["username"] = r.FormValue("username")
+	values["password"] = r.FormValue("password")
+
+	return values, nil
 }
 
 // isEmptyPHP meniru pengecekan kosong PHP untuk string.
@@ -95,7 +108,7 @@ func Auth(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		username, err := getPost(r, "username")
+		postData, err := getPostValues(r)
 		if err != nil {
 			writeJSON(w, 400, map[string]any{
 				"success": false,
@@ -104,14 +117,8 @@ func Auth(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		password, err := getPost(r, "password")
-		if err != nil {
-			writeJSON(w, 400, map[string]any{
-				"success": false,
-				"message": "Request tidak valid",
-			})
-			return
-		}
+		username := postData["username"]
+		password := postData["password"]
 
 		// Validasi username terlebih dahulu, mengikuti CI3.
 		if isEmptyPHP(username) {
